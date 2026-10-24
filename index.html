@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#002147">
+  <title>Canasta Escolar | Tecno Rivas</title>
+  <meta name="description" content="Registra tu factura y participa en el sorteo Canasta Escolar de Tecno Rivas.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ OVERLAY DE VIDEO DE INTRODUCCIÓN ============ -->
+  <div id="intro-overlay" role="dialog" aria-label="Video de introducción">
+    <video id="intro-video" muted playsinline autoplay preload="auto">
+      <source src="intro.mp4" type="video/mp4">
+    </video>
+    <button id="skip-intro" type="button" aria-label="Saltar introducción">
+      Saltar Intro
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+    </button>
+  </div>
+
+  <!-- ============ APLICACIÓN PRINCIPAL ============ -->
+  <main class="page" id="app">
+    <div class="bg-shape bg-shape-1" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-2" aria-hidden="true"></div>
+
+    <div id="offline-badge" class="offline-badge" hidden>
+      Sin conexión: tus datos se guardarán y se enviarán automáticamente.
+    </div>
+
+    <section class="card" id="form-card">
+      <div class="banner-wrap">
+        <img src="banner.png" alt="Sorteo Canasta Escolar - Tecno Rivas" class="banner" loading="eager">
+      </div>
+
+      <div class="card-body" id="form-view">
+        <h1>Registra tu factura</h1>
+        <p class="subtitle">Completa tus datos para participar en el sorteo <strong>Canasta Escolar</strong>. Compras desde <strong>C$ 1,500.00</strong>.</p>
+
+        <form id="invoice-form" novalidate autocomplete="off">
+          <div class="field">
+            <label for="cedula">Número de cédula</label>
+            <input type="text" id="cedula" name="cedula" placeholder="001-010190-0001A" maxlength="16" autocapitalize="characters" required>
+            <small class="error-msg" id="err-cedula"></small>
+          </div>
+
+          <div class="field">
+            <label for="telefono">Número de teléfono</label>
+            <input type="tel" id="telefono" name="telefono" placeholder="8888-8888" inputmode="numeric" maxlength="9" required>
+            <small class="error-msg" id="err-telefono"></small>
+          </div>
+
+          <div class="field">
+            <label for="factura">Número de factura</label>
+            <input type="text" id="factura" name="factura" placeholder="Ej. 000123" maxlength="30" required>
+            <small class="error-msg" id="err-factura"></small>
+          </div>
+
+          <div class="field">
+            <label for="total">Total de la factura (C$)</label>
+            <div class="input-prefix">
+              <span>C$</span>
+              <input type="text" id="total" name="total" placeholder="1,500.00" inputmode="decimal" required>
+            </div>
+            <small class="error-msg" id="err-total"></small>
+          </div>
+
+          <div class="alert-error" id="alert-min" role="alert" hidden></div>
+
+          <button type="submit" class="btn-primary" id="submit-btn">
+            <span class="btn-label">Registrar factura</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Pantalla de éxito -->
+      <div class="card-body success-view" id="success-view" hidden>
+        <div class="check-circle" aria-hidden="true">
+          <svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17" fill="none" stroke="#002147" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2>¡Registro exitoso!</h2>
+        <p class="subtitle" id="success-text">Tu factura ha sido registrada y ya participas en el sorteo <strong>Canasta Escolar</strong>. ¡Mucha suerte!</p>
+        <button type="button" class="btn-secondary" id="new-entry">Registrar otra factura</button>
+      </div>
+
+      <footer class="card-footer">© <span id="year"></span> Tecno Rivas · Todos los derechos reservados</footer>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
