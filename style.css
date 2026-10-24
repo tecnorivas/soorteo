@@ -55,6 +55,24 @@ body {
   background: #000;
 }
 
+#play-intro {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 16px 30px;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--navy-900);
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(245, 158, 11, 0.5);
+}
+#play-intro[hidden] { display: none; }
+
 #skip-intro {
   position: absolute;
   right: 20px;
