@@ -6,7 +6,7 @@
    ► CONFIGURACIÓN: PEGA AQUÍ LA URL DE TU APLICACIÓN WEB DE GOOGLE APPS SCRIPT
    Ejemplo: "https://script.google.com/macros/s/AKfycb.../exec"
    --------------------------------------------------------------------- */
-const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbxy0GGGiKUDnScecbmcwm3FiFCG17vMF65wNKG0WcB-4bib3lAENUFuelPeEW3NYLvmHw/exec"; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
+const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyxPe7h_elWDn24oG_kVsY5KYz6iJQeQcu9onXujphPMEYRHhVhcAL6X963R5kh7mw_dg/exec"; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
 
 const MIN_TOTAL = 1500;
 const STORAGE_KEY = "tecnorivas_pendientes_v1";
