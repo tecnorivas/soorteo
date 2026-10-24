@@ -10,7 +10,7 @@ const GAS_ENDPOINT = ""; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
 
 const MIN_TOTAL = 1500;
 const STORAGE_KEY = "tecnorivas_pendientes_v1";
-const INTRO_FALLBACK_MS = 10000;  // Tiempo SIN progreso del video antes de ocultar la intro
+const INTRO_FALLBACK_MS = 45000;  // Tiempo SIN progreso del video antes de ocultar la intro
 const INTRO_MAX_MS = 60000;       // Tope absoluto de seguridad
 const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
 
@@ -56,6 +56,13 @@ const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
   video.querySelectorAll("source").forEach(s => s.addEventListener("error", closeIntro));
   skipBtn.addEventListener("click", closeIntro);
 
+  const playBtn = document.getElementById("play-intro");
+  playBtn.addEventListener("click", () => {
+    video.muted = true;
+    playBtn.hidden = true;
+    video.play().catch(closeIntro);
+  });
+
   document.addEventListener("keydown", (e) => {
     if (!closed && (e.key === "Escape" || e.key === "Enter")) closeIntro();
   });
@@ -65,8 +72,12 @@ const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
   const p = video.play();
   if (p && typeof p.catch === "function") {
     p.catch((err) => {
-      // Autoplay bloqueado → no atrapar al usuario. Otros errores los cubre el temporizador.
-      if (err && err.name === "NotAllowedError") closeIntro();
+      // Autoplay bloqueado → se muestra un botón para reproducir manualmente.
+      // Otros errores los cubre el temporizador / el evento "error".
+      if (err && err.name === "NotAllowedError") {
+        clearTimeout(stallTimer);
+        playBtn.hidden = false;
+      }
     });
   }
 })();
