@@ -6,13 +6,13 @@
    ► CONFIGURACIÓN: PEGA AQUÍ LA URL DE TU APLICACIÓN WEB DE GOOGLE APPS SCRIPT
    Ejemplo: "https://script.google.com/macros/s/AKfycb.../exec"
    --------------------------------------------------------------------- */
-const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbxgbBuCi8DWX1aivBdI_jcrVYeZt9sIIMFvF21UvjUK8NCYNYj9LAkzedlkcDU3HAC7WQ/exec"; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
+const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyMyOfe3mGwckRtsJORVlmazWyTOOnCsNJeSMsdbc7p-WyF4vCX9u1yQY3KYm8x2cImpA/exec"; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
 
 const MIN_TOTAL = 1500;
 const STORAGE_KEY = "tecnorivas_pendientes_v1";
 const INTRO_FALLBACK_MS = 45000;  // Tiempo SIN progreso del video antes de ocultar la intro
 const INTRO_MAX_MS = 60000;       // Tope absoluto de seguridad
-const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
+const SUBMIT_TIMEOUT_MS = 20000;  // Espera máxima de respuesta del servidor
 
 /* =========================== INTRO OVERLAY =========================== */
 (function initIntro() {
@@ -216,8 +216,10 @@ function removeFromQueue(id) {
 }
 
 /* ================= ENVÍO SIN CORS: FORM + IFRAME OCULTO ================ */
-// Devuelve una promesa que se resuelve cuando el iframe termina de cargar
-// (la respuesta de Apps Script no es legible por CORS, pero la carga confirma el envío).
+// Envía el registro con un formulario POST dentro de un iframe oculto (sin CORS).
+// La página que devuelve Apps Script avisa el resultado con postMessage:
+//   { source:"canasta-escolar", id, status:"ok"|"duplicate"|"invalid"|"error", message }
+// La promesa se resuelve con ese objeto; se rechaza si no hay respuesta a tiempo.
 function sendViaIframe(record) {
   return new Promise((resolve, reject) => {
     if (!GAS_ENDPOINT) {
@@ -255,24 +257,25 @@ function sendViaIframe(record) {
     });
 
     let done = false;
-    let loads = 0;
-    const cleanup = () => {
-      setTimeout(() => { iframe.remove(); f.remove(); }, 500);
-    };
-    const finish = (ok, err) => {
+    const finish = (ok, payload) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
-      cleanup();
-      ok ? resolve() : reject(err);
+      window.removeEventListener("message", onMessage);
+      setTimeout(() => { iframe.remove(); f.remove(); }, 500);
+      ok ? resolve(payload) : reject(payload);
     };
 
-    // El iframe vacío dispara "load" al insertarse; la segunda carga es la respuesta real.
-    iframe.addEventListener("load", () => {
-      loads++;
-      if (loads >= 2) finish(true);
-    });
-    iframe.addEventListener("error", () => finish(false, new Error("Error de red")));
+    function onMessage(ev) {
+      const d = ev.data;
+      if (!d || d.source !== "canasta-escolar" || d.id !== record.id) return;
+      // Solo se aceptan respuestas que vengan de Google
+      let host = "";
+      try { host = new URL(ev.origin).hostname; } catch (e) {}
+      if (!/(^|\.)(googleusercontent|google)\.com$/.test(host)) return;
+      finish(true, d);
+    }
+    window.addEventListener("message", onMessage);
 
     const timer = setTimeout(
       () => finish(false, new Error("Tiempo de espera agotado")),
@@ -281,7 +284,6 @@ function sendViaIframe(record) {
 
     document.body.appendChild(iframe);
     document.body.appendChild(f);
-    // Pequeño retardo para que el iframe registre su carga inicial antes del POST
     setTimeout(() => f.submit(), 50);
   });
 }
@@ -295,10 +297,13 @@ async function syncPending() {
   syncing = true;
   for (const rec of queue) {
     try {
-      await sendViaIframe(rec);
+      const res = await sendViaIframe(rec);
+      // ok / duplicate / invalid: el servidor ya decidió → sale de la cola.
+      // error: se reintenta en el próximo ciclo.
+      if (res.status === "error") break;
       removeFromQueue(rec.id);
     } catch (e) {
-      break; // Reintenta en el próximo ciclo
+      break; // Sin respuesta: reintenta en el próximo ciclo
     }
   }
   syncing = false;
@@ -314,6 +319,12 @@ setInterval(syncPending, 30000);
 updateOnlineStatus();
 
 /* ============================== ENVÍO ================================= */
+function resetSubmitButton() {
+  submitBtn.disabled = false;
+  submitBtn.classList.remove("loading");
+  submitBtn.querySelector(".btn-label").textContent = "Registrar factura";
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!validate()) return;
@@ -334,18 +345,39 @@ form.addEventListener("submit", async (e) => {
   // Siempre se guarda primero localmente (respaldo seguro)
   enqueue(record);
 
-  let sentOnline = false;
+  let result = null;
   if (navigator.onLine && GAS_ENDPOINT) {
     try {
-      await sendViaIframe(record);
-      removeFromQueue(record.id);
-      sentOnline = true;
+      result = await sendViaIframe(record);
     } catch (err) {
-      console.warn("Envío fallido, queda en cola local:", err.message);
+      console.warn("Sin respuesta del servidor, queda en cola local:", err.message);
     }
   }
 
-  showSuccess(sentOnline);
+  if (result && result.status === "ok") {
+    removeFromQueue(record.id);
+    showSuccess(true);
+    return;
+  }
+
+  if (result && result.status === "duplicate") {
+    removeFromQueue(record.id);
+    resetSubmitButton();
+    setError("factura", "Esta factura ya fue registrada. Verifica el número.");
+    fields.factura.focus();
+    return;
+  }
+
+  if (result && result.status === "invalid") {
+    removeFromQueue(record.id);
+    resetSubmitButton();
+    alertMin.textContent = result.message || "Los datos no son válidos.";
+    alertMin.hidden = false;
+    return;
+  }
+
+  // Sin conexión, sin respuesta o error del servidor: queda en cola y se reintenta.
+  showSuccess(false);
 });
 
 /* ============================ PANTALLA ÉXITO ========================== */
@@ -384,22 +416,3 @@ $("new-entry").addEventListener("click", () => {
   $("form-view").hidden = false;
   fields.cedula.focus();
 });
-
-/* =====================================================================
-   REFERENCIA: CÓDIGO PARA GOOGLE APPS SCRIPT (Code.gs)
-   Despliega como "Aplicación web" → Ejecutar como: Yo → Acceso: Cualquier usuario
-
-   function doPost(e) {
-     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Registros")
-              || SpreadsheetApp.getActiveSpreadsheet().insertSheet("Registros");
-     if (sheet.getLastRow() === 0) {
-       sheet.appendRow(["ID","Fecha","Cédula","Teléfono","Factura","Total (C$)"]);
-     }
-     var p = e.parameter;
-     var ids = sheet.getRange(2, 1, Math.max(sheet.getLastRow() - 1, 1), 1).getValues().flat();
-     if (ids.indexOf(p.id) === -1) {            // evita duplicados al reintentar
-       sheet.appendRow([p.id, p.fechaRegistro, "'" + p.cedula, "'" + p.telefono, "'" + p.factura, Number(p.total)]);
-     }
-     return HtmlService.createHtmlOutput("OK");
-   }
-   ===================================================================== */
