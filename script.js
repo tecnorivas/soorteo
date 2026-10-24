@@ -10,7 +10,7 @@ const GAS_ENDPOINT = ""; // <<< COLOCA AQUÍ LA URL DEL ENDPOINT >>>
 
 const MIN_TOTAL = 1500;
 const STORAGE_KEY = "tecnorivas_pendientes_v1";
-const INTRO_FALLBACK_MS = 2500;   // Si el video no arranca, se oculta tras este tiempo
+const INTRO_FALLBACK_MS = 10000;  // Tiempo SIN progreso del video antes de ocultar la intro
 const INTRO_MAX_MS = 60000;       // Tope absoluto de seguridad
 const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
 
@@ -25,7 +25,7 @@ const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
   function closeIntro() {
     if (closed) return;
     closed = true;
-    clearTimeout(fallbackTimer);
+    clearTimeout(stallTimer);
     clearTimeout(maxTimer);
     try { video.pause(); } catch (e) {}
     overlay.classList.add("fade-out");
@@ -35,16 +35,24 @@ const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
 
   document.body.style.overflow = "hidden";
 
-  // Fallback: si no empieza a reproducirse en pocos segundos, se oculta.
-  const fallbackTimer = setTimeout(() => { if (!started) closeIntro(); }, INTRO_FALLBACK_MS);
+  // Fallback: si el video no avanza (ni descarga ni reproduce) durante
+  // INTRO_FALLBACK_MS, se oculta. Cada señal de progreso reinicia el reloj.
+  let stallTimer = null;
+  function armStall() {
+    clearTimeout(stallTimer);
+    if (!closed) stallTimer = setTimeout(closeIntro, INTRO_FALLBACK_MS);
+  }
+  armStall();
   // Tope máximo por si el video se congela a mitad.
   const maxTimer = setTimeout(closeIntro, INTRO_MAX_MS);
 
-  video.addEventListener("playing", () => { started = true; });
-  video.addEventListener("timeupdate", () => { if (video.currentTime > 0) started = true; });
+  video.addEventListener("playing", () => { started = true; clearTimeout(stallTimer); });
+  video.addEventListener("timeupdate", () => { if (video.currentTime > 0) { started = true; clearTimeout(stallTimer); } });
+  ["loadstart", "loadedmetadata", "loadeddata", "progress", "canplay", "waiting"].forEach((ev) =>
+    video.addEventListener(ev, () => { if (!started || ev === "waiting") armStall(); })
+  );
   video.addEventListener("ended", closeIntro);
   video.addEventListener("error", closeIntro);
-  video.addEventListener("stalled", () => setTimeout(() => { if (!started) closeIntro(); }, 1500));
   video.querySelectorAll("source").forEach(s => s.addEventListener("error", closeIntro));
   skipBtn.addEventListener("click", closeIntro);
 
@@ -56,7 +64,10 @@ const SUBMIT_TIMEOUT_MS = 12000;  // Espera máxima de respuesta del iframe
   video.muted = true;
   const p = video.play();
   if (p && typeof p.catch === "function") {
-    p.catch(() => closeIntro()); // Autoplay bloqueado → no atrapar al usuario
+    p.catch((err) => {
+      // Autoplay bloqueado → no atrapar al usuario. Otros errores los cubre el temporizador.
+      if (err && err.name === "NotAllowedError") closeIntro();
+    });
   }
 })();
 
